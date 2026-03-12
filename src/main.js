@@ -47,8 +47,8 @@ function createSidebarLink(id, name, isActive) {
   const a = document.createElement('a');
   a.href = '#';
   a.className = isActive 
-    ? 'block active-nav-item font-bold text-sm px-4 py-2.5 transition-all font-mono'
-    : 'block text-white text-sm hover:text-brand-accent transition-colors font-mono';
+    ? 'block active-nav-item font-bold text-sm px-4 py-2.5 transition-all font-mono focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:outline-none'
+    : 'block text-white text-sm hover:text-brand-accent transition-colors font-mono focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:outline-none rounded';
   a.style.fontFamily = "'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace";
   a.textContent = name;
   return a;
@@ -127,7 +127,10 @@ async function toggleLanguage() {
       if (titleEl) titleEl.innerText = filteredArticles[i].title;
       if (descEl) descEl.innerText = filteredArticles[i].description;
       if (timeEl) timeEl.innerText = currentLang === 'pt' ? timeAgoPt(filteredArticles[i].pubDate) : timeAgo(filteredArticles[i].pubDate);
-      if (readMoreEl) readMoreEl.innerHTML = `${currentLang === 'pt' ? 'Leia mais' : 'Read more'} <span class="text-[14px]">→</span>`;
+      if (readMoreEl) {
+        readMoreEl.innerHTML = `${currentLang === 'pt' ? 'Leia mais' : 'Read more'} <span class="text-[14px]" aria-hidden="true">→</span>`;
+        readMoreEl.setAttribute('aria-label', `${currentLang === 'pt' ? 'Leia mais sobre' : 'Read more about'} ${filteredArticles[i].title}`);
+      }
     }
   }
 
@@ -141,7 +144,7 @@ function updateLangUI(lang) {
   langToggle.setAttribute('aria-label', isPt ? 'Read in English' : 'Traduzir página para Português');
   langToggle.setAttribute('title', isPt ? 'Read in English' : 'Traduzir página');
   langToggle.innerHTML = `
-    <span class="material-symbols-outlined text-[16px]">translate</span>
+    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">translate</span>
     <span>${isPt ? 'Read in English' : 'Traduzir (PT-BR)'}</span>
   `;
 }
@@ -184,7 +187,7 @@ function renderFeed() {
 
   filteredArticles.forEach(article => {
     const card = document.createElement('article');
-    card.className = 'bg-brand-card rounded-xl border border-brand-border overflow-hidden flex flex-col group hover:border-brand-accent/50 transition-colors cursor-pointer';
+    card.className = 'bg-brand-card rounded-xl border border-brand-border overflow-hidden flex flex-col group hover:border-brand-accent/50 focus-within:ring-2 focus-within:ring-brand-accent focus-within:border-transparent transition-colors cursor-pointer';
     card.addEventListener('click', () => { window.open(article.link, '_blank'); });
     
     card.innerHTML = `
@@ -197,8 +200,8 @@ function renderFeed() {
         </p>
         <div class="mt-auto flex justify-between items-center pt-4 border-t border-brand-border/50">
           <span class="text-brand-muted text-xs font-mono">${currentLang === 'pt' ? timeAgoPt(article.pubDate) : timeAgo(article.pubDate)}</span>
-          <a class="text-brand-accent text-xs font-bold hover:underline flex items-center gap-1" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
-            ${currentLang === 'pt' ? 'Leia mais' : 'Read more'} <span class="text-[14px]">→</span>
+          <a class="text-brand-accent text-xs font-bold hover:underline flex items-center gap-1 focus-visible:outline-none" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" aria-label="${currentLang === 'pt' ? 'Leia mais sobre' : 'Read more about'} ${escapeHtml(article.title)}">
+            ${currentLang === 'pt' ? 'Leia mais' : 'Read more'} <span class="text-[14px]" aria-hidden="true">→</span>
           </a>
         </div>
       </div>
