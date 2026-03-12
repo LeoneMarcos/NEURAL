@@ -40,7 +40,7 @@ You only need an HTTP Server to run it locally (due to CORS rules in modern brow
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/NEURAL.git
+   git clone https://github.com/LeoneMarcos/NEURAL.git
    ```
 
 2. Navigate to the project directory:
