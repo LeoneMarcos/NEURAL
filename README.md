@@ -51,15 +51,24 @@ You only need an HTTP Server to run it locally (due to CORS rules in modern brow
    cd NEURAL
    ```
 
-3. Start your local server:
-   - _Using npm/npx:_
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+4. Start your local server:
+   - _Using npm (Recommended - Vite):_
+     ```bash
+     npm run dev
+     ```
+   - _Using npx:_
      ```bash
      npx serve
      ```
    - _Using VS Code:_
      Right-click on `index.html` and select **"Open with Live Server"**.
 
-4. Open your browser and go to the provided localhost URL (e.g. `http://localhost:3000`).
+5. Open your browser and go to the provided localhost URL (e.g. `http://localhost:5173` for Vite).
 
 
 
