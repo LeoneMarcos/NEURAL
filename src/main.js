@@ -1,6 +1,23 @@
+import * as Sentry from "@sentry/browser";
 import { fetchAllFeeds, SOURCES } from './feed.js';
 import { timeAgo, timeAgoPt, escapeHtml } from './utils.js';
 import { translateArticle, restoreOriginal } from './translate.js';
+
+// Sentry Initialization
+if (import.meta.env.PROD) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration(),
+    ],
+    // Performance Monitoring
+    tracesSampleRate: 1.0, 
+    // Session Replay
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+  });
+}
 
 let articles = [];
 let currentFilter = 'all';
