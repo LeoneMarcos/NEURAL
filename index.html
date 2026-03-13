@@ -96,6 +96,236 @@
       line-height: 1.4;
     }
   </style>
+<!-- BEGIN: Setup Overlay Styles -->
+<style data-purpose="setup">
+  /* ── Overlay ── */
+  #setup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  #setup-overlay.setup-visible { opacity: 1; }
+  #setup-overlay.setup-exit    { opacity: 0; pointer-events: none; }
+
+  /* ── Background grid pattern ── */
+  .setup-bg-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* ── Modal card ── */
+  .setup-modal {
+    position: relative;
+    background: #111111;
+    border: 1px solid #333;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 560px;
+    padding: 40px 40px 36px;
+    box-shadow: 0 0 60px rgba(0,255,65,0.08), 0 20px 60px rgba(0,0,0,0.6);
+    animation: setupSlideIn 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  @keyframes setupSlideIn {
+    from { transform: translateY(30px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0) scale(1);       opacity: 1; }
+  }
+
+  /* ── Header ── */
+  .setup-header { margin-bottom: 24px; }
+  .setup-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .setup-logo-img { width: 28px; height: 28px; filter: drop-shadow(0 0 8px rgba(0,255,65,0.6)); }
+  .setup-logo-text { font-size: 1.3rem; font-weight: 800; color: #fff; letter-spacing: 0.1em; }
+  .setup-subtitle { font-size: 0.78rem; color: #888; font-family: monospace; }
+
+  /* ── Step dots indicator ── */
+  .setup-steps-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 28px;
+  }
+  .step-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #333;
+    border: 2px solid #444;
+    transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    flex-shrink: 0;
+  }
+  .step-dot.active {
+    background: #00FF41;
+    border-color: #00FF41;
+    box-shadow: 0 0 8px rgba(0,255,65,0.6);
+  }
+  .step-dot.done {
+    background: #00c832;
+    border-color: #00c832;
+  }
+  .step-line {
+    flex: 1;
+    height: 2px;
+    background: #333;
+    margin: 0 6px;
+    transition: background 0.4s;
+  }
+  .step-line.filled { background: #00FF41; }
+
+  /* ── Step containers ── */
+  .setup-step { display: none; }
+  .setup-step.active-step { display: block; animation: stepFadeIn 0.3s ease; }
+  @keyframes stepFadeIn {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .setup-step-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .step-icon { font-size: 20px; color: #00FF41; }
+  .setup-step-desc { font-size: 0.82rem; color: #888; margin-bottom: 20px; }
+
+  /* ── Source cards grid ── */
+  .sources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .source-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 14px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.84rem;
+    color: #aaa;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, color 0.2s, box-shadow 0.2s;
+    text-align: left;
+    font-weight: 500;
+  }
+  .source-card:hover {
+    border-color: #555;
+    background: #222;
+    color: #fff;
+  }
+  .source-card.selected {
+    border-color: #00FF41;
+    background: rgba(0,255,65,0.06);
+    color: #fff;
+    box-shadow: 0 0 14px rgba(0,255,65,0.12);
+  }
+  .source-check {
+    font-size: 18px;
+    color: #444;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+  .source-card.selected .source-check { color: #00FF41; }
+  .source-name { line-height: 1.2; }
+
+  /* ── Language cards ── */
+  .lang-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .lang-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 14px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    text-align: center;
+  }
+  .lang-card:hover { border-color: #555; background: #222; }
+  .lang-card.selected {
+    border-color: #00FF41;
+    background: rgba(0,255,65,0.06);
+    box-shadow: 0 0 16px rgba(0,255,65,0.14);
+  }
+  .lang-flag  { font-size: 2rem; }
+  .lang-name  { font-size: 0.95rem; font-weight: 700; color: #fff; }
+  .lang-desc  { font-size: 0.72rem; color: #888; line-height: 1.4; }
+
+  /* ── Action buttons ── */
+  .setup-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #00FF41;
+    color: #000;
+    font-weight: 800;
+    font-size: 0.85rem;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s, box-shadow 0.2s, transform 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 18px rgba(0,255,65,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-primary:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    color: #888;
+    font-size: 0.82rem;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #333;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .btn-ghost:hover { color: #fff; border-color: #555; }
+  .btn-icon { font-size: 16px; }
+</style>
+<!-- END: Setup Overlay Styles -->
 <!-- END: Custom Styles -->
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&amp;display=swap" rel="stylesheet"/></head>
 <body class="h-full overflow-hidden flex flex-col">
@@ -107,14 +337,13 @@
 <img src="./favicon.png" alt="Neural Logo" class="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(0,255,65,0.6)]">
 <h1 class="text-2xl text-white font-bold tracking-wide">Neural</h1>
 </div>
-<span class="text-brand-muted text-sm border-l border-brand-border pl-4 ml-2">AI News Aggregator</span>
+<span id="ui-tagline" class="text-brand-muted text-sm border-l border-brand-border pl-4 ml-2">AI News Aggregator</span>
 </div>
 <!-- Search Bar -->
-<!-- Language Selector -->
-<div class="flex items-center">
-<button id="lang-toggle" aria-label="Traduzir página para Português" title="Traduzir página" class="bg-brand-background border border-brand-border rounded-lg px-4 py-1.5 text-xs font-bold flex items-center gap-2 hover:bg-white/5 transition-colors">
-<span class="material-symbols-outlined text-[16px]">translate</span>
-<span>Traduzir (PT-BR)</span>
+<!-- Header Actions: Settings only -->
+<div class="flex items-center gap-3">
+<button id="settings-btn" aria-label="Open settings" title="Reconfigure sources &amp; language" class="bg-brand-background border border-brand-border rounded-lg px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 hover:bg-white/5 transition-colors text-brand-muted hover:text-white">
+<span class="material-symbols-outlined text-[16px]">settings</span>
 </button>
 </div>
 </header>
@@ -124,7 +353,7 @@
 <!-- BEGIN: Sidebar -->
 <aside class="w-64 bg-brand-sidebar flex flex-col p-8 pt-16 shrink-0 relative">
 <div class="mb-8">
-<h2 class="text-brand-muted text-[10px] uppercase tracking-[0.2em] font-bold mb-6">Sources</h2>
+<h2 id="ui-sources-label" class="text-brand-muted text-[10px] uppercase tracking-[0.2em] font-bold mb-6">Sources</h2>
 <nav class="space-y-4" id="sidebar-nav">
 </nav>
 </div>

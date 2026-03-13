@@ -122,7 +122,9 @@ describe('feed.js', () => {
     localStorage.getItem.mockReturnValue(JSON.stringify(expiredData));
     fetch.mockResolvedValue({ ok: false });
     await fetchAllFeeds();
-    expect(localStorage.removeItem).toHaveBeenCalledWith('neural_feed_cache');
+    // Cache key now includes sorted source IDs
+    const expectedKey = `neural_feed_cache_${SOURCES.map(s => s.id).sort().join(',')}`;
+    expect(localStorage.removeItem).toHaveBeenCalledWith(expectedKey);
   });
 
   it('should fallback to latest 30 if none in window', async () => {
@@ -137,5 +139,56 @@ describe('feed.js', () => {
     localStorage.getItem.mockReturnValue(JSON.stringify(cachedData));
     const articles = await fetchAllFeeds({ hoursLimit: 1 });
     expect(articles.length).toBe(30);
+  });
+
+  it('should handle corrupt cache JSON gracefully', async () => {
+    // Covers loadCache catch branch (line 219)
+    localStorage.getItem.mockReturnValue('{ invalid json }}}');
+    fetch.mockResolvedValue({ ok: true, text: async () => RSS_XML });
+
+    const originalSources = [...SOURCES];
+    SOURCES.length = 0;
+    SOURCES.push({ id: 'rss', name: 'RSS', feedUrl: 'https://rss.com/feed' });
+
+    const articles = await fetchAllFeeds({ forceRefresh: false });
+    expect(articles.length).toBeGreaterThan(0); // fell through to fetch
+
+    SOURCES.length = 0;
+    SOURCES.push(...originalSources);
+  });
+
+  it('should fetch only selectedSourceIds when provided', async () => {
+    // Covers selectedSourceIds branch (line 244)
+    fetch.mockResolvedValue({ ok: true, text: async () => RSS_XML });
+
+    const originalSources = [...SOURCES];
+    SOURCES.length = 0;
+    SOURCES.push(
+      { id: 'src-a', name: 'A', feedUrl: 'https://a.com/feed' },
+      { id: 'src-b', name: 'B', feedUrl: 'https://b.com/feed' },
+    );
+
+    const articles = await fetchAllFeeds({ forceRefresh: true, selectedSourceIds: ['src-a'] });
+    expect(articles.length).toBeGreaterThan(0);
+    articles.forEach(a => expect(a.sourceId).toBe('src-a'));
+
+    SOURCES.length = 0;
+    SOURCES.push(...originalSources);
+  });
+
+  it('should handle saveCache storage error gracefully', async () => {
+    // Covers saveCache catch branch (line ~233)
+    localStorage.setItem.mockImplementationOnce(() => { throw new Error('Storage full'); });
+    fetch.mockResolvedValue({ ok: true, text: async () => RSS_XML });
+
+    const originalSources = [...SOURCES];
+    SOURCES.length = 0;
+    SOURCES.push({ id: 'rss', name: 'RSS', feedUrl: 'https://rss.com/feed' });
+
+    // Should not throw even when storage fails
+    await expect(fetchAllFeeds({ forceRefresh: true })).resolves.toBeDefined();
+
+    SOURCES.length = 0;
+    SOURCES.push(...originalSources);
   });
 });

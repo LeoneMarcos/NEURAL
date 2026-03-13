@@ -205,13 +205,13 @@ function simpleHash(str) {
 /**
  * Load from localStorage cache
  */
-function loadCache() {
+function loadCache(key = CACHE_KEY) {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (Date.now() - parsed.timestamp > CACHE_TTL) {
-      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(key);
       return null;
     }
     return parsed.articles;
@@ -223,9 +223,9 @@ function loadCache() {
 /**
  * Save to localStorage cache
  */
-function saveCache(articles) {
+function saveCache(key = CACHE_KEY, articles) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
+    localStorage.setItem(key, JSON.stringify({
       timestamp: Date.now(),
       articles,
     }));
@@ -236,10 +236,20 @@ function saveCache(articles) {
 
 /**
  * Fetch all feeds, merge, sort, and filter to last 24 hours
+ * @param {{ forceRefresh?: boolean, hoursLimit?: number, selectedSourceIds?: string[] }} options
  */
-export async function fetchAllFeeds({ forceRefresh = false, hoursLimit = 24 } = {}) {
+export async function fetchAllFeeds({ forceRefresh = false, hoursLimit = 24, selectedSourceIds = null } = {}) {
+  // Determine which sources to fetch
+  const activeSources = selectedSourceIds && selectedSourceIds.length > 0
+    ? SOURCES.filter(s => selectedSourceIds.includes(s.id))
+    : SOURCES;
+
+  // Cache key is namespaced by source selection so different configs don't collide
+  const sourceKey = activeSources.map(s => s.id).sort().join(',');
+  const cacheKey = `${CACHE_KEY}_${sourceKey}`;
+
   if (!forceRefresh) {
-    const cached = loadCache();
+    const cached = loadCache(cacheKey);
     if (cached) {
       console.log('[NEURAL] Loaded from cache');
       return filterByHours(cached, hoursLimit);
@@ -247,7 +257,7 @@ export async function fetchAllFeeds({ forceRefresh = false, hoursLimit = 24 } = 
   }
 
   // Stagger requests by 250ms to prevent rate limiting from CORS proxies
-  const promises = SOURCES.map(async (source, index) => {
+  const promises = activeSources.map(async (source, index) => {
     await new Promise(r => setTimeout(r, index * 250));
     return fetchSingleFeed(source);
   });
@@ -262,7 +272,7 @@ export async function fetchAllFeeds({ forceRefresh = false, hoursLimit = 24 } = 
   });
 
   allArticles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  saveCache(allArticles);
+  saveCache(cacheKey, allArticles);
   return filterByHours(allArticles, hoursLimit);
 }
 

@@ -1,7 +1,8 @@
 import * as Sentry from "@sentry/browser";
 import { fetchAllFeeds, SOURCES } from './feed.js';
 import { timeAgo, timeAgoPt, escapeHtml } from './utils.js';
-import { translateArticle, restoreOriginal } from './translate.js';
+import { translateArticle } from './translate.js';
+import { showSetup, loadPrefs, clearPrefs } from './setup.js';
 
 // Sentry Initialization
 if (import.meta.env.PROD) {
@@ -22,17 +23,92 @@ if (import.meta.env.PROD) {
 let articles = [];
 let currentFilter = 'all';
 let currentLang = 'en'; // default language
+let activeSources = SOURCES.map(s => s.id); // default: all sources
+
+// ── UI string dictionary ──────────────────────────────────────────────────────
+const UI_STRINGS = {
+  en: {
+    tagline:    'AI News Aggregator',
+    sources:    'Sources',
+    allSources: 'All Sources',
+    noArticles: 'No articles found.',
+    readMore:   'Read more',
+    translating: (n, total) => `Translating ${n} / ${total}…`,
+  },
+  pt: {
+    tagline:    'Agregador de Notícias de IA',
+    sources:    'Fontes',
+    allSources: 'Todas as fontes',
+    noArticles: 'Nenhum artigo encontrado.',
+    readMore:   'Leia mais',
+    translating: (n, total) => `Traduzindo ${n} / ${total}…`,
+  },
+};
+
+/** Shorthand — returns the string for the current language */
+const t = (key, ...args) => {
+  const entry = UI_STRINGS[currentLang]?.[key] ?? UI_STRINGS.en[key];
+  return typeof entry === 'function' ? entry(...args) : entry;
+};
 
 const newsGrid = document.getElementById('news-grid');
 const sidebarNav = document.getElementById('sidebar-nav');
-const langToggle = document.getElementById('lang-toggle');
+const settingsBtn = document.getElementById('settings-btn');
 
 async function init() {
+  const prefs = loadPrefs();
+
+  if (!prefs) {
+    // First launch — show setup wizard
+    showSetup(async (selectedPrefs) => {
+      applyPrefs(selectedPrefs);
+      await loadFeed();
+    });
+    return;
+  }
+
+  // Prefs already saved — apply and go
+  applyPrefs(prefs);
+  await loadFeed();
+}
+
+/**
+ * Apply saved preferences to app state and UI
+ */
+function applyPrefs(prefs) {
+  activeSources = prefs.sources && prefs.sources.length > 0 ? prefs.sources : SOURCES.map(s => s.id);
+  currentLang = prefs.lang || 'en';
+  currentFilter = 'all';
+  applyUITranslation();
   renderSidebar();
-  setupListeners();
+}
+
+/**
+ * Update all static UI strings to the current language.
+ */
+function applyUITranslation() {
+  const taglineEl      = document.getElementById('ui-tagline');
+  const sourcesLabelEl = document.getElementById('ui-sources-label');
+  if (taglineEl)      taglineEl.textContent      = t('tagline');
+  if (sourcesLabelEl) sourcesLabelEl.textContent = t('sources');
+  // Update html lang attribute
+  document.documentElement.lang = currentLang === 'pt' ? 'pt-BR' : 'en';
+}
+
+/**
+ * Fetch feed, translate in memory if PT, then render once — skeleton stays visible until done.
+ */
+async function loadFeed() {
   renderLoading();
   try {
-    articles = await fetchAllFeeds();
+    articles = await fetchAllFeeds({ selectedSourceIds: activeSources });
+
+    // Translate all articles in memory BEFORE rendering —
+    // the loading skeleton stays visible until every article is ready.
+    if (currentLang === 'pt') {
+      articles = await translateAllInMemory(articles);
+    }
+
     renderFeed();
   } catch (error) {
     console.error('Error fetching feeds:', error);
@@ -40,17 +116,44 @@ async function init() {
   }
 }
 
+/**
+ * Translate an array of articles to PT in memory.
+ * Shows a "Traduzindo X / N" counter in the loading skeleton.
+ * @param {object[]} rawArticles
+ * @returns {Promise<object[]>} fully translated articles
+ */
+async function translateAllInMemory(rawArticles) {
+  const hint = document.createElement('p');
+  hint.id = 'translate-hint';
+  hint.className = 'text-brand-muted text-xs font-mono col-span-full text-center mt-2';
+  hint.textContent = t('translating', 0, rawArticles.length);
+  newsGrid.appendChild(hint);
+
+  const translated = [];
+  for (let i = 0; i < rawArticles.length; i++) {
+    try {
+      translated.push(await translateArticle(rawArticles[i]));
+    } catch {
+      translated.push(rawArticles[i]);
+    }
+    hint.textContent = t('translating', i + 1, rawArticles.length);
+  }
+  return translated;
+}
+
 function renderSidebar() {
   sidebarNav.innerHTML = '';
   
-  const allSourcesLink = createSidebarLink('all', 'All Sources', currentFilter === 'all');
+  const allSourcesLink = createSidebarLink('all', t('allSources'), currentFilter === 'all');
   allSourcesLink.addEventListener('click', (e) => {
     e.preventDefault();
     setFilter('all');
   });
   sidebarNav.appendChild(allSourcesLink);
 
-  SOURCES.forEach(source => {
+  // Only show the sources the user chose during setup
+  const visibleSources = SOURCES.filter(s => activeSources.includes(s.id));
+  visibleSources.forEach(source => {
     const link = createSidebarLink(source.id, source.name, currentFilter === source.id);
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -77,91 +180,22 @@ function setFilter(filterId) {
   renderFeed();
 }
 
-function setupListeners() {
-  if (langToggle) {
-    langToggle.addEventListener('click', toggleLanguage);
+/**
+ * Register global UI listeners once on boot — never call more than once.
+ */
+function registerGlobalListeners() {
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+      clearPrefs();
+      showSetup(async (selectedPrefs) => {
+        articles = [];
+        applyPrefs(selectedPrefs);
+        await loadFeed();
+      });
+    });
   }
 }
 
-async function toggleLanguage() {
-  langToggle.disabled = true;
-  langToggle.classList.add('opacity-50', 'pointer-events-none');
-
-  const isTranslatingToPt = currentLang === 'en';
-  currentLang = isTranslatingToPt ? 'pt' : 'en';
-
-  if (isTranslatingToPt) {
-    updateLangUI('pt');
-  } else {
-    updateLangUI('en');
-  }
-
-  let filteredArticles = articles;
-  if (currentFilter !== 'all') {
-    filteredArticles = articles.filter(a => a.sourceId === currentFilter);
-  }
-
-  const cards = newsGrid.children;
-
-  for (let i = 0; i < filteredArticles.length; i++) {
-    const cardEl = cards[i];
-
-    if (cardEl) {
-      // Glow and pulse effect to show processing
-      cardEl.classList.add('animate-pulse', 'border-brand-accent');
-      cardEl.style.boxShadow = '0 0 15px 2px rgba(0, 255, 65, 0.4)';
-    }
-
-    try {
-      if (isTranslatingToPt) {
-        const translated = await translateArticle(filteredArticles[i]);
-        const idx = articles.findIndex(a => a.id === translated.id);
-        if (idx !== -1) articles[idx] = translated;
-        filteredArticles[i] = translated;
-      } else {
-        const restored = restoreOriginal([filteredArticles[i]])[0];
-        const idx = articles.findIndex(a => a.id === restored.id);
-        if (idx !== -1) articles[idx] = restored;
-        filteredArticles[i] = restored;
-      }
-      
-      // Cascade down effect: artificially await to ensure the glow animation
-      // is visible even if the text was instantly loaded from cache
-      await new Promise(r => setTimeout(r, 150));
-    } catch (e) {
-      console.error('Translation failed for card', e);
-    }
-
-    if (cardEl) {
-      cardEl.classList.remove('animate-pulse', 'border-brand-accent');
-      cardEl.style.boxShadow = '';
-      
-      const titleEl = cardEl.querySelector('h3');
-      const descEl = cardEl.querySelector('p');
-      const timeEl = cardEl.querySelector('.mt-auto span');
-      const readMoreEl = cardEl.querySelector('.mt-auto a');
-      
-      if (titleEl) titleEl.innerText = filteredArticles[i].title;
-      if (descEl) descEl.innerText = filteredArticles[i].description;
-      if (timeEl) timeEl.innerText = currentLang === 'pt' ? timeAgoPt(filteredArticles[i].pubDate) : timeAgo(filteredArticles[i].pubDate);
-      if (readMoreEl) readMoreEl.innerHTML = `${currentLang === 'pt' ? 'Leia mais' : 'Read more'} <span class="text-[14px]">→</span>`;
-    }
-  }
-
-  langToggle.classList.remove('opacity-50', 'pointer-events-none');
-  langToggle.disabled = false;
-}
-
-function updateLangUI(lang) {
-  if (!langToggle) return;
-  const isPt = lang === 'pt';
-  langToggle.setAttribute('aria-label', isPt ? 'Read in English' : 'Traduzir página para Português');
-  langToggle.setAttribute('title', isPt ? 'Read in English' : 'Traduzir página');
-  langToggle.innerHTML = `
-    <span class="material-symbols-outlined text-[16px]">translate</span>
-    <span>${isPt ? 'Read in English' : 'Traduzir (PT-BR)'}</span>
-  `;
-}
 
 function renderLoading() {
   newsGrid.innerHTML = '';
@@ -195,7 +229,7 @@ function renderFeed() {
   }
 
   if (filteredArticles.length === 0) {
-    newsGrid.innerHTML = '<p class="text-brand-muted col-span-1 md:col-span-2 xl:col-span-3">No articles found.</p>';
+    newsGrid.innerHTML = `<p class="text-brand-muted col-span-1 md:col-span-2 xl:col-span-3">${t('noArticles')}</p>`;
     return;
   }
 
@@ -215,7 +249,7 @@ function renderFeed() {
         <div class="mt-auto flex justify-between items-center pt-4 border-t border-brand-border/50">
           <span class="text-brand-muted text-xs font-mono">${currentLang === 'pt' ? timeAgoPt(article.pubDate) : timeAgo(article.pubDate)}</span>
           <a class="text-brand-accent text-xs font-bold hover:underline flex items-center gap-1" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
-            ${currentLang === 'pt' ? 'Leia mais' : 'Read more'} <span class="text-[14px]">→</span>
+            ${t('readMore')} <span class="text-[14px]">→</span>
           </a>
         </div>
       </div>
@@ -224,4 +258,7 @@ function renderFeed() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  registerGlobalListeners();
+  init();
+});
