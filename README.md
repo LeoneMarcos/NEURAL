@@ -117,6 +117,6 @@ If you want to add a new news source or improve the UI, feel free to fork the re
 
 ## 📝 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the Apache License 2.0. See `LICENSE` for more information.
 
 Enjoy reading your daily dose of AI news! 🚀
