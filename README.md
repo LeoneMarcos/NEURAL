@@ -76,13 +76,6 @@ You only need an HTTP Server to run it locally (due to CORS rules in modern brow
 
 NEURAL maintains an extremely high quality bar with a comprehensive test suite.
 
-### Coverage Summary
-
-- **Total Coverage:** **98.37%**
-- **Utils & Helpers:** 100%
-- **Translations:** 98.3%
-- **Feed Integration:** 97.7%
-
 ### Running Tests
 
 To run the automated test suite and generate coverage reports:
